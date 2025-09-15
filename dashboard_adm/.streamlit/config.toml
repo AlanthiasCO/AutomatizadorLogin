@@ -1,0 +1,11 @@
+[theme]
+# Cor primária para elementos interativos
+primaryColor="#5a87e8"
+# Cor de fundo do conteúdo principal
+backgroundColor="#0E1117"
+# Cor de fundo da sidebar e outros elementos secundários
+secondaryBackgroundColor="#262730"
+# Cor do texto principal
+textColor="#FAFAFA"
+# A fonte pode ser sans serif, serif, or monospace
+font="sans serif"
