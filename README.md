@@ -2,7 +2,10 @@
 Automatiza o login de alunos em uma plataforma educacional e fornece um dashboard em tempo real para monitorar acessos e detectar possíveis violações de regras.
 
 [creenshot da interface]  
-![Dashboard](img/1.png)
+![Dashboard - Página inicial](img/1.png)
+![Dashboard - Página 2](img/2.PNG)
+![Dashboard - Página 3](img/3.PNG)
+
 Funcionalidades principais
 - Automação de Login: Interface gráfica (Tkinter) para os alunos selecionarem seu perfil e acessarem a plataforma via Selenium.
 - Registro de Atividade: Todos os logins são registrados em uma planilha do Google Sheets para auditoria.
