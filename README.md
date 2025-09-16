@@ -1,8 +1,11 @@
 # Sistema de Automação de Login e Dashboard
 Automatiza o login de alunos em uma plataforma educacional e fornece um dashboard em tempo real para monitorar acessos e detectar possíveis violações de regras.
 
-[creenshot da interface]  
-[screenshot do dashboard]
+![Interface](img/login.PNG)
+![Dashboard - Página inicial](img/1.png)
+![Dashboard - Página 2](img/2.PNG)
+![Dashboard - Página 3](img/3.PNG)
+![Dashboard - Loocker Studio](img/loocker.PNG)
 
 Funcionalidades principais
 - Automação de Login: Interface gráfica (Tkinter) para os alunos selecionarem seu perfil e acessarem a plataforma via Selenium.
