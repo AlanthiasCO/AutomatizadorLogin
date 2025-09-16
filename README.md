@@ -1,7 +1,7 @@
 # Sistema de Automação de Login e Dashboard
 Automatiza o login de alunos em uma plataforma educacional e fornece um dashboard em tempo real para monitorar acessos e detectar possíveis violações de regras.
 
-[creenshot da interface]  
+![Interface](img/login.png)
 ![Dashboard - Página inicial](img/1.png)
 ![Dashboard - Página 2](img/2.PNG)
 ![Dashboard - Página 3](img/3.PNG)
