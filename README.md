@@ -5,6 +5,7 @@ Automatiza o login de alunos em uma plataforma educacional e fornece um dashboar
 ![Dashboard - Página inicial](img/1.png)
 ![Dashboard - Página 2](img/2.PNG)
 ![Dashboard - Página 3](img/3.PNG)
+![Dashboard - Loocker Studio](img/loocker.PNG)
 
 Funcionalidades principais
 - Automação de Login: Interface gráfica (Tkinter) para os alunos selecionarem seu perfil e acessarem a plataforma via Selenium.
