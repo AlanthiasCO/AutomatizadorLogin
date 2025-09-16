@@ -31,16 +31,12 @@ SCOPE = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/au
 load_dotenv()
 CREDENTIALS_PATH = os.getenv('GOOGLE_CREDENTIALS_PATH') or 'credentials.json'
 
-
 # --- VARIÁVEIS GLOBAIS ---
 ALL_USERS = []
 root = None
 
-
 def perform_login(email, password):
-    """
-    Função para executar o processo de login e retornar a instância do driver.
-    """
+# Função para executar o processo de login e retornar a instância do driver.
     options = Options()
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     
@@ -64,11 +60,8 @@ def perform_login(email, password):
         driver.quit()
         return None
 
-
 def register_log(user_data):
-    """
-    Registra o acesso de um usuário, traduzindo o nome da máquina usando a aba 'Maquinas'.
-    """
+# Registra o acesso de um usuário, traduzindo o nome da máquina usando a aba 'Maquinas'.
     try:
         print("Iniciando registro de log...")
         hostname = socket.gethostname()
@@ -88,21 +81,30 @@ def register_log(user_data):
         except Exception as e:
             print(f"Erro ao ler a aba de máquinas: {e}. Usando hostname real.")
 
-        timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        log_row = [timestamp, user_data['nome'], user_data['email'], user_data['escola'], machine_name_to_log]
+        agora = datetime.now()
+        data_atual = agora.strftime("%d/%m/%Y")
+        hora_atual = agora.strftime("%H:%M:%S")
         
+        log_row = [
+            data_atual, 
+            hora_atual, 
+            user_data['nome'], 
+            user_data['email'], 
+            user_data['escola'], 
+            machine_name_to_log
+        ]                    
+
         try:
             worksheet_logs = spreadsheet.worksheet(LOG_WORKSHEET_NAME)
         except gspread.exceptions.WorksheetNotFound:
             worksheet_logs = spreadsheet.add_worksheet(title=LOG_WORKSHEET_NAME, rows="1000", cols="10")
-            worksheet_logs.append_row(["Timestamp", "Nome Aluno", "Email", "Escola", "Nome da Máquina"])
+            worksheet_logs.append_row(["Data", "Hora", "Nome Aluno", "Email", "Escola", "Nome da Máquina"])
         
         worksheet_logs.append_row(log_row)
         print(f"Log registrado com sucesso para: {user_data['nome']} na máquina '{machine_name_to_log}'")
 
     except Exception as e:
         print(f"ERRO GERAL AO REGISTRAR O LOG: {e}")
-
 
 def load_data():
     global ALL_USERS
@@ -141,7 +143,6 @@ def load_data():
         messagebox.showerror("Erro Inesperado", f"Ocorreu um erro ao carregar os dados:\n{e}")
         sys.exit(1)
 
-
 def update_options(*args):
     school_selected = var_school.get()
     period_selected = var_period.get()
@@ -156,7 +157,6 @@ def update_options(*args):
             name_list.insert('end', user['nome'])
     else:
         name_list.delete(0, 'end')
-
 
 def start_login():
     try:
@@ -181,11 +181,8 @@ def start_login():
         messagebox.showerror("Erro", f"Ocorreu um erro: {e}")
         start_application()
 
-
 def manage_session(driver):
-    """
-    Gerencia a sessão, monitorando se o navegador foi fechado e encerrando o tempo.
-    """
+# Gerencia a sessão, monitorando se o navegador foi fechado e encerrando o tempo.
     start_time = time.time()
     timeout = SESSION_DURATION_MINUTES * 60
     try:
@@ -210,7 +207,6 @@ def manage_session(driver):
         except Exception:
             pass
     sys.exit(0)
-
 
 def start_application():
     global root, var_school, var_period, var_series, name_list
@@ -289,7 +285,6 @@ def start_application():
 
     update_options()
     root.mainloop()
-
 
 if __name__ == "__main__":
     start_application()
