@@ -1,6 +1,8 @@
 import sys
 from dotenv import load_dotenv
 import time
+import json
+import os
 import os
 import socket
 from datetime import datetime
@@ -13,6 +15,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from tkinter import Tk, Label, OptionMenu, StringVar, Button, Listbox, messagebox, Frame
+from datetime import datetime, timedelta
+
 
 # --- CONSTANTES ---
 URL_LOGIN = 'https://accounts.google.com/o/oauth2/auth/oauthchooseaccount?client_id=717821919461-ri9sne01f21k4p0b1acbkr5j65j2ph3h.apps.googleusercontent.com&redirect_uri=https%3A%2F%2Fwww.matific.com%2Fsocial%2Fcomplete%2Fparana-municipal%2F&response_type=code&scope=openid%20email%20profile&service=lso&o2v=1&flowName=GeneralOAuthFlow'
@@ -31,9 +35,48 @@ SCOPE = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/au
 load_dotenv()
 CREDENTIALS_PATH = os.getenv('GOOGLE_CREDENTIALS_PATH') or 'credentials.json'
 
+def carregar_cronograma():
+    # Carrega o cronograma a partir do arquivo json
+    try:
+        # Encontra o caminho correto, funcione tanto em modo normal quanto em .exe
+        base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+        json_path = os.path.join(base_path, 'cronograma.json')
+        
+        with open(json_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        messagebox.showerror("Erro Crítico", "O arquivo 'cronograma.json' não foi encontrado!")
+        sys.exit(1)
+    except json.JSONDecodeError:
+        messagebox.showerror("Erro Crítico", "O arquivo 'cronograma.json' contém um erro de sintaxe.")
+        sys.exit(1)
+
 # --- VARIÁVEIS GLOBAIS ---
 ALL_USERS = []
 root = None
+
+
+def verificar_horario_atual():
+    # Verifica o dia e hora atuais e retorna a turma permitida conforme o CRONOGRAMA.
+    # Retorna um dicionário com 'escola' e 'serie' se houver uma turma, senão None.
+    CRONOGRAMA = carregar_cronograma()     
+    agora = datetime.now()
+    hora_atual = agora.time()
+    dia_semana_num = agora.weekday() # Segunda é 0, Terça é 1...
+
+    mapa_dias = {
+        0: "Segunda-feira", 1: "Terça-feira", 2: "Quarta-feira",
+        3: "Quinta-feira", 4: "Sexta-feira", 5: "Sábado", 6: "Domingo"
+    }
+    dia_semana_atual = mapa_dias.get(dia_semana_num)
+
+    for agendamento in CRONOGRAMA:
+        if agendamento["dia"] == dia_semana_atual:
+            inicio = datetime.strptime(agendamento["inicio"], "%H:%M").time()
+            fim = datetime.strptime(agendamento["fim"], "%H:%M").time()
+            if inicio <= hora_atual <= fim:
+                return agendamento 
+    return None
 
 def perform_login(email, password):
 # Função para executar o processo de login e retornar a instância do driver.
@@ -60,6 +103,54 @@ def perform_login(email, password):
         driver.quit()
         return None
 
+def processar_acesso_filtrado(spreadsheet, user_data, machine_name, timestamp_atual):
+    try:
+        try:
+            worksheet = spreadsheet.worksheet("acessos_filtrados")
+        except gspread.exceptions.WorksheetNotFound:
+            worksheet = spreadsheet.add_worksheet(title="acessos_filtrados", rows="1000", cols="1")
+            worksheet.append_row(["Registro de Acesso Significativo"])
+
+        registros = worksheet.get_all_values()
+        
+        ultimo_registro_da_maquina = None
+        for registro in reversed(registros):
+            if machine_name in registro[0]:
+                ultimo_registro_da_maquina = registro[0]
+                break
+        
+        if ultimo_registro_da_maquina is None:
+            print(f"Primeiro acesso registrado para a máquina {machine_name}.")
+            novo_registro = f"{user_data['nome']} acessou na {machine_name} - {timestamp_atual.strftime('%d/%m/%Y %H:%M:%S')}"
+            worksheet.append_row([novo_registro])
+            return
+
+        partes = ultimo_registro_da_maquina.split(' - ')
+        timestamp_anterior_str = partes[-1]
+        nome_anterior = partes[0].split(' acessou na ')[0]
+        
+        timestamp_anterior = datetime.strptime(timestamp_anterior_str, '%d/%m/%Y %H:%M:%S')
+
+        if user_data['nome'] != nome_anterior:
+            print(f"Novo usuário ({user_data['nome']}) na máquina {machine_name}. Registrando acesso.")
+            novo_registro = f"{user_data['nome']} acessou na {machine_name} - {timestamp_atual.strftime('%d/%m/%Y %H:%M:%S')}"
+            worksheet.append_row([novo_registro])
+            return
+            
+        diferenca_tempo = timestamp_atual - timestamp_anterior
+        
+        if diferenca_tempo > timedelta(hours=2):
+            print(f"Mesmo usuário ({user_data['nome']}) após 2h. Registrando novo acesso.")
+            novo_registro = f"{user_data['nome']} acessou na {machine_name} - {timestamp_atual.strftime('%d/%m/%Y %H:%M:%S')}"
+            worksheet.append_row([novo_registro])
+            return
+
+        print(f"Acesso repetido de {user_data['nome']} em menos de 2h. Não registrando.")
+
+    except Exception as e:
+        print(f"ERRO AO PROCESSAR ACESSO FILTRADO: {e}")
+
+
 def register_log(user_data):
 # Registra o acesso de um usuário, traduzindo o nome da máquina usando a aba 'Maquinas'.
     try:
@@ -84,6 +175,8 @@ def register_log(user_data):
         agora = datetime.now()
         data_atual = agora.strftime("%d/%m/%Y")
         hora_atual = agora.strftime("%H:%M:%S")
+
+        processar_acesso_filtrado(spreadsheet, user_data, machine_name_to_log, agora)
         
         log_row = [
             data_atual, 
@@ -147,7 +240,9 @@ def update_options(*args):
     school_selected = var_school.get()
     period_selected = var_period.get()
     series_selected = var_series.get()
-    if (school_selected != "Selecione a Escola" and period_selected != "Selecione o Período" and series_selected != "Selecione a Série"):
+    
+    # Condição alterada para lidar com os valores pré-selecionados
+    if (school_selected != "Selecione a Escola" and period_selected and series_selected != "Selecione a Série"):
         filtered_users = [
             user for user in ALL_USERS
             if user['escola'] == school_selected and user['periodo'] == period_selected and user['serie'] == series_selected
@@ -239,35 +334,29 @@ def start_application():
     button_bg = "#7B61FF"
     button_fg = "white"
 
-    available_schools = sorted(list(set(user['escola'] for user in ALL_USERS)))
-    available_periods = sorted(list(set(user['periodo'] for user in ALL_USERS if user['periodo'])))
-    available_series = sorted(list(set(user['serie'] for user in ALL_USERS)))
+    turma_permitida = verificar_horario_atual()
 
-    var_school = StringVar(root); var_school.set("Selecione a Escola")
-    var_school.trace_add("write", update_options)
+    # Criação das variáveis e menus
+    var_school = StringVar(root)
+    var_period = StringVar(root) #'period' está sendo usado para a 'turma' (A, B...)
+    var_series = StringVar(root)
+
     Label(main_frame, text="Escola:", bg=bg_color, fg=text_color, font=label_font).pack(anchor="w", pady=(10, 5))
-    school_menu = OptionMenu(main_frame, var_school, "Selecione a Escola", *available_schools)
+    school_menu = OptionMenu(main_frame, var_school, "")
     school_menu.config(font=option_font, bg=widget_bg, fg=text_color, relief="flat", highlightthickness=0, activebackground=widget_bg, activeforeground=text_color)
     school_menu["menu"].config(font=option_font, bg=widget_bg, fg=text_color)
-    school_menu["menu"].delete(0) ### CORREÇÃO: Remove o "Selecione a Escola" da lista de opções.
     school_menu.pack(fill="x", ipady=5, pady=(0, 10))
 
-    var_period = StringVar(root); var_period.set("Selecione o Período")
-    var_period.trace_add("write", update_options)
     Label(main_frame, text="Período:", bg=bg_color, fg=text_color, font=label_font).pack(anchor="w", pady=(10, 5))
-    period_menu = OptionMenu(main_frame, var_period, "Selecione o Período", *available_periods)
+    period_menu = OptionMenu(main_frame, var_period, "")
     period_menu.config(font=option_font, bg=widget_bg, fg=text_color, relief="flat", highlightthickness=0, activebackground=widget_bg, activeforeground=text_color)
     period_menu["menu"].config(font=option_font, bg=widget_bg, fg=text_color)
-    period_menu["menu"].delete(0) ### CORREÇÃO: Remove o "Selecione o Período" da lista de opções.
     period_menu.pack(fill="x", ipady=5, pady=(0, 10))
 
-    var_series = StringVar(root); var_series.set("Selecione a Série")
-    var_series.trace_add("write", update_options)
     Label(main_frame, text="Série:", bg=bg_color, fg=text_color, font=label_font).pack(anchor="w", pady=(10, 5))
-    series_menu = OptionMenu(main_frame, var_series, "Selecione a Série", *available_series)
+    series_menu = OptionMenu(main_frame, var_series, "")
     series_menu.config(font=option_font, bg=widget_bg, fg=text_color, relief="flat", highlightthickness=0, activebackground=widget_bg, activeforeground=text_color)
     series_menu["menu"].config(font=option_font, bg=widget_bg, fg=text_color)
-    series_menu["menu"].delete(0) ### CORREÇÃO: Remove o "Selecione a Série" da lista de opções.
     series_menu.pack(fill="x", ipady=5, pady=(0, 10))
 
     Label(main_frame, text="Selecione seu nome:", bg=bg_color, fg=text_color, font=label_font).pack(anchor="w", pady=(15, 5))
@@ -279,11 +368,44 @@ def start_application():
                        bg=button_bg, fg=button_fg, relief="flat", pady=10)
     login_btn.pack(pady=10, fill='x')
 
-    footer_text = "Desenvolvido por Alan Mathias | Para mais informações: alanmathiasctt@gmail.com ou 44 99989-2733"
+    # Se estiver dentro de um horário de aula permitido
+    if turma_permitida:
+        escola_permitida = turma_permitida['escola']
+        serie_permitida = turma_permitida['serie']
+        turma_agendada = turma_permitida['turma'] 
+
+        # Preenche e desabilita os menus diretamente com os dados do cronograma
+        var_school.set(escola_permitida)
+        var_period.set(turma_agendada) 
+        var_series.set(serie_permitida)
+        
+        school_menu.config(state="disabled")
+        period_menu.config(state="disabled")
+        series_menu.config(state="disabled")
+
+        update_options()
+
+        # Verifica se a lista de nomes está vazia após a atualização
+        if name_list.size() == 0:
+            full_turma_name = f"{serie_permitida} - {turma_agendada} - {escola_permitida}"
+            Label(main_frame, text=f"Turma agendada ({full_turma_name}) não encontrada na planilha.",
+                  bg=bg_color, fg="orange", font=label_font).pack(pady=5)
+            login_btn.config(state="disabled")
+
+    else:
+        var_school.set("Fora do horário de aula")
+        var_period.set("Nenhum login permitido")
+        var_series.set("Tente novamente mais tarde")
+
+        school_menu.config(state="disabled")
+        period_menu.config(state="disabled")
+        series_menu.config(state="disabled")
+        login_btn.config(state="disabled")
+
+    footer_text = "Desenvolvido por Alan Mathias | Para mais informações: alanmathiasctt@gmail.com"
     footer_label = Label(main_frame, text=footer_text, font=("Segoe UI", 8), bg=bg_color, fg="#A0A0A0")
     footer_label.pack(side="bottom", pady=(10, 0))
 
-    update_options()
     root.mainloop()
 
 if __name__ == "__main__":
