@@ -1,0 +1,27 @@
+Esse é um exemplo de cronograma para ser usado em .json
+
+[
+    {
+        "dia": "Terça-feira",
+        "inicio": "16:40",
+        "fim": "17:05",
+        "serie": "4º Ano",
+        "turma": "A",
+        "escola": "JOHN KENNEDY"
+    },
+    {
+        "dia": "Segunda-feira",
+        "inicio": "07:40",
+        "fim": "09:40",
+        "serie": "4º Ano",
+        "turma": "A",
+        "escola": "MONTEIRO LOBATO"
+    },
+    {
+        "dia": "Terça-feira",
+        "inicio": "07:40",
+        "fim": "09:40",
+        "serie": "5º Ano",
+        "turma": "A",
+        "escola": "MONTEIRO LOBATO"
+    },
