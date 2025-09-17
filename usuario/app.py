@@ -3,7 +3,6 @@ from dotenv import load_dotenv
 import time
 import json
 import os
-import os
 import socket
 from datetime import datetime
 import gspread
@@ -33,7 +32,8 @@ SCOPE = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/au
          "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
 
 load_dotenv()
-CREDENTIALS_PATH = os.getenv('GOOGLE_CREDENTIALS_PATH') or 'credentials.json'
+
+CREDENTIALS_PATH = os.getenv("GOOGLE_CREDENTIALS_PATH") or "credentials.json"
 
 def carregar_cronograma():
     # Carrega o cronograma a partir do arquivo json
@@ -54,21 +54,29 @@ def carregar_cronograma():
 # --- VARIÁVEIS GLOBAIS ---
 ALL_USERS = []
 root = None
+CRONOGRAMA = carregar_cronograma()
 
+# Variáveis globais para gspread
+gspread_creds = None
+gspread_client = None
+gspread_spreadsheet = None
+
+MAPA_DIAS = {
+    0: "Segunda-feira", 1: "Terça-feira", 2: "Quarta-feira",
+    3: "Quinta-feira", 4: "Sexta-feira", 5: "Sábado", 6: "Domingo"
+}
 
 def verificar_horario_atual():
     # Verifica o dia e hora atuais e retorna a turma permitida conforme o CRONOGRAMA.
     # Retorna um dicionário com 'escola' e 'serie' se houver uma turma, senão None.
-    CRONOGRAMA = carregar_cronograma()     
+
     agora = datetime.now()
     hora_atual = agora.time()
     dia_semana_num = agora.weekday() # Segunda é 0, Terça é 1...
 
-    mapa_dias = {
-        0: "Segunda-feira", 1: "Terça-feira", 2: "Quarta-feira",
-        3: "Quinta-feira", 4: "Sexta-feira", 5: "Sábado", 6: "Domingo"
-    }
-    dia_semana_atual = mapa_dias.get(dia_semana_num)
+    dia_semana_atual = MAPA_DIAS.get(dia_semana_num)
+
+
 
     for agendamento in CRONOGRAMA:
         if agendamento["dia"] == dia_semana_atual:
@@ -158,17 +166,13 @@ def register_log(user_data):
         hostname = socket.gethostname()
         machine_name_to_log = hostname
         
-        creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_PATH, SCOPE)
-        client = gspread.authorize(creds)
-        spreadsheet = client.open(SPREADSHEET_NAME)
+        spreadsheet = gspread_spreadsheet
         
         try:
             worksheet_machines = spreadsheet.worksheet(MACHINES_WORKSHEET_NAME)
             machine_list = worksheet_machines.get_all_records()
             machine_map = {item["Hostname"]: item["Apelido"] for item in machine_list}
             machine_name_to_log = machine_map.get(hostname, hostname)
-        except gspread.exceptions.WorksheetNotFound:
-            print(f"Aviso: Aba '{MACHINES_WORKSHEET_NAME}' não encontrada. Usando hostname real.")
         except Exception as e:
             print(f"Erro ao ler a aba de máquinas: {e}. Usando hostname real.")
 
@@ -187,11 +191,8 @@ def register_log(user_data):
             machine_name_to_log
         ]                    
 
-        try:
-            worksheet_logs = spreadsheet.worksheet(LOG_WORKSHEET_NAME)
-        except gspread.exceptions.WorksheetNotFound:
-            worksheet_logs = spreadsheet.add_worksheet(title=LOG_WORKSHEET_NAME, rows="1000", cols="10")
-            worksheet_logs.append_row(["Data", "Hora", "Nome Aluno", "Email", "Escola", "Nome da Máquina"])
+        worksheet_logs = spreadsheet.worksheet(LOG_WORKSHEET_NAME)
+
         
         worksheet_logs.append_row(log_row)
         print(f"Log registrado com sucesso para: {user_data['nome']} na máquina '{machine_name_to_log}'")
@@ -203,9 +204,13 @@ def load_data():
     global ALL_USERS
     ALL_USERS = []
     try:
-        creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_PATH, SCOPE)
-        client = gspread.authorize(creds)
-        sheet = client.open(SPREADSHEET_NAME).sheet1
+        global gspread_creds, gspread_client, gspread_spreadsheet
+        if gspread_client is None:
+            gspread_creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_PATH, SCOPE)
+            gspread_client = gspread.authorize(gspread_creds)
+        if gspread_spreadsheet is None:
+            gspread_spreadsheet = gspread_client.open(SPREADSHEET_NAME)
+        sheet = gspread_spreadsheet.sheet1
         sheet_data = sheet.get_all_records()
         
         if not sheet_data:
@@ -304,8 +309,35 @@ def manage_session(driver):
     sys.exit(0)
 
 def start_application():
-    global root, var_school, var_period, var_series, name_list
+    global root, var_school, var_period, var_series, name_list, gspread_client, gspread_spreadsheet
     load_data()
+
+    # Inicializa gspread client e spreadsheet se ainda não estiverem inicializados
+    if gspread_client is None:
+        gspread_creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_PATH, SCOPE)
+        gspread_client = gspread.authorize(gspread_creds)
+    if gspread_spreadsheet is None:
+        gspread_spreadsheet = gspread_client.open(SPREADSHEET_NAME)
+
+    # Garante que as worksheets de log e máquinas existam
+    try:
+        gspread_spreadsheet.worksheet(LOG_WORKSHEET_NAME)
+    except gspread.exceptions.WorksheetNotFound:
+        ws = gspread_spreadsheet.add_worksheet(title=LOG_WORKSHEET_NAME, rows="1000", cols="10")
+        ws.append_row(["Data", "Hora", "Nome Aluno", "Email", "Escola", "Nome da Máquina"])
+    
+    try:
+        gspread_spreadsheet.worksheet(MACHINES_WORKSHEET_NAME)
+    except gspread.exceptions.WorksheetNotFound:
+        # Cria a worksheet de máquinas se não existir, sem cabeçalho inicial
+        gspread_spreadsheet.add_worksheet(title=MACHINES_WORKSHEET_NAME, rows="1000", cols="2")
+
+    try:
+        gspread_spreadsheet.worksheet("acessos_filtrados")
+    except gspread.exceptions.WorksheetNotFound:
+        ws = gspread_spreadsheet.add_worksheet(title="acessos_filtrados", rows="1000", cols="1")
+        ws.append_row(["Registro de Acesso Significativo"])
+
     
     root = Tk()
     root.title("Automatizador de Login")
