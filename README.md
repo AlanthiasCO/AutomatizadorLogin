@@ -39,30 +39,7 @@ Ferramentas
 - (Opcional) PyInstaller para gerar um executável
 
 ## Instalação
-1. Clone o repositório
-```bash
-git clone https://github.com/seu-usuario/seu-repositorio.git
-cd seu-repositorio
-```
-
-2. Crie e ative um ambiente virtual (recomendado)
-- Windows (PowerShell)
-```powershell
-python -m venv venv
-.\venv\Scripts\Activate.ps1
-```
-- Windows (CMD)
-```cmd
-python -m venv venv
-.\venv\Scripts\activate
-```
-- macOS / Linux
-```bash
-python3 -m venv venv
-source venv/bin/activate
-```
-
-3. Instale as dependências
+Instale as dependências
 ```bash
 pip install -r requirements.txt
 ```
