@@ -52,7 +52,7 @@ pip install -r requirements.txt
 # Caminho absoluto para o arquivo de credenciais da conta de serviço
 GOOGLE_CREDENTIALS_PATH="/caminho/para/credentials.json"
 # Exemplo no Windows (escape de barras ou use barras normais)
-# GOOGLE_CREDENTIALS_PATH="C:\\Users\\Alan\\Documentos\\chaves\\credentials.json"
+# GOOGLE_CREDENTIALS_PATH="C:\\Users\\Documentos\\chaves\\credentials.json"
 # ID ou URL da planilha do Google Sheets onde os logs serão gravados
 GOOGLE_SHEET_ID="seu_google_sheet_id_aqui"
 ```
